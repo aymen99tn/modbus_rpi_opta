@@ -34,7 +34,7 @@ def gen_values():
         temperature_model_parameters=temperature_model_parameters,
     )
 
-    weather_df = pd.read_excel('data/weather_washingtonDC_2016.xlsx')	
+    weather_df = pd.read_excel('weather_washingtonDC_2016.xlsx')	
 
     #drop the first row and change the header
     weather_df = weather_df.drop(0)
