@@ -4,7 +4,7 @@ import time
 # --- RPI-2 Configuration (Server/Slave) ---
 SERVER_HOST = "0.0.0.0"  # CRITICAL: RPI-2's fixed IP
 SERVER_PORT = 502
-TEST_POWER_INT = 25555        # Test value: 255.55 kW scaled by 100
+TEST_POWER_INT = 25552        # Test value: 255.55 kW scaled by 100
 
 # 1. Initialize Modbus Server
 #    (No need to pass register sizes; v0.3.0 handles this dynamically)
