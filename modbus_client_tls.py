@@ -9,7 +9,7 @@ from pymodbus.exceptions import ModbusException
 
 SERVER_IP = "10.9.64.175"   
 PORT = 802 
-UNIT_ID = 1
+UNIT_ID = 255
 
 SEND_PERIOD_SEC = 10
 EXCEL_PATH = "weather_washingtonDC_2016.xlsx"  
