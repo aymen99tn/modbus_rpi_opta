@@ -238,7 +238,7 @@ async def forwarder_task():
                 result = await client.write_registers(
                     address=0,
                     values=registers,
-                    slave=OPTA_UNIT_ID
+                    device_id=OPTA_UNIT_ID
                 )
 
                 if not result.isError():
