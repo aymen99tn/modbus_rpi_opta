@@ -7,12 +7,12 @@ from pymodbus.client import ModbusTlsClient
 from pymodbus.exceptions import ModbusException
 
 
-SERVER_IP = "192.168.5.83"   
+SERVER_IP = "10.9.64.175"   
 PORT = 802 
 UNIT_ID = 1
 
 SEND_PERIOD_SEC = 10
-EXCEL_PATH = "weather_washingtonDC_2016.xlsx"  # 
+EXCEL_PATH = "weather_washingtonDC_2016.xlsx"  
 
 
 def u16(x: int) -> int:
@@ -143,7 +143,7 @@ def main():
 
     sslctx = ssl.create_default_context()
     sslctx.check_hostname = False
-    sslctx.verify_mode = ssl.CERT_NONE  # testing only
+    sslctx.verify_mode = ssl.CERT_NONE 
 
     client = ModbusTlsClient(host=SERVER_IP, port=PORT, sslctx=sslctx)
 
