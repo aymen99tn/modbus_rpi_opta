@@ -21,7 +21,7 @@ TCP_BIND_PORT = 502
 # TLS Server Configuration (receives from RPI#1)
 TLS_BIND_ADDRESS = "0.0.0.0"
 TLS_BIND_PORT = 802
-UNIT_ID = 1
+UNIT_ID = 255  # Changed to match Opta's Modbus address
 
 SERVER_CERT = "server.crt"
 SERVER_KEY = "server.key"
