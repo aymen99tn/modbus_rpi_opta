@@ -1,5 +1,4 @@
 modbus_venv/
-*.cpp
 .vscode
 CLAUDE.md
 AGENTS.md

@@ -23,7 +23,7 @@ Opta --[Ethernet, Modbus TCP:502]--> RPI#2 --[Ethernet, IEC 61850 MMS:102]--> SI
 
 ```bash
 # Use IEDScout or DIGSI to:
-1. Connect to SIPROTEC at 192.168.3.250:102
+1. Connect to SIPROTEC at 192.168.1.21:102
 2. Verify Logical Device name (LD0, LD1, or custom)
 3. Verify MMXU1 Logical Node exists
 4. Check data objects are read-write:
