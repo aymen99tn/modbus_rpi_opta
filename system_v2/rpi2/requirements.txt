@@ -1,0 +1,4 @@
+pymodbus>=3.5.0
+pyiec61850>=1.5.2
+asyncio
+pyyaml

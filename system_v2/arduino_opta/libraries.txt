@@ -1,0 +1,41 @@
+# Required Arduino Libraries
+
+## Arduino IDE Installation
+
+1. Open Arduino IDE
+2. Go to: Sketch → Include Library → Manage Libraries
+3. Search and install:
+
+- **ArduinoModbus** (by Arduino)
+  - Version: Latest stable
+  - Description: Modbus TCP/RTU client and server library
+
+- **Ethernet** (built-in)
+  - Pre-installed with Arduino IDE
+  - No additional installation needed
+
+## Library Dependencies
+
+ArduinoModbus automatically installs:
+- Arduino_PortentaMachineControl (if needed)
+
+## Verification
+
+After installation, verify in: Sketch → Include Library
+You should see:
+- ArduinoModbus
+- Ethernet
+
+## Manual Installation (if needed)
+
+If automatic installation fails:
+
+1. Download ArduinoModbus from:
+   https://github.com/arduino-libraries/ArduinoModbus
+
+2. Extract to Arduino libraries folder:
+   - Windows: Documents\Arduino\libraries\
+   - Mac: ~/Documents/Arduino/libraries/
+   - Linux: ~/Arduino/libraries/
+
+3. Restart Arduino IDE

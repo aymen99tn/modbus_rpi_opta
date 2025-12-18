@@ -1,5 +1,7 @@
 modbus_venv/
 *.cpp
-*.md
+.vscode
+CLAUDE.md
+AGENTS.md
 arduino_opta_server.ino
 test_bridge.py
