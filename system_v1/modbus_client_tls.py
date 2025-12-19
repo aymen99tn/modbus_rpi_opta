@@ -7,16 +7,24 @@ from pymodbus.client import ModbusTlsClient
 from pymodbus.exceptions import ModbusException
 
 
+<<<<<<< HEAD:system_v1/modbus_client_tls.py
 SERVER_IP = "10.9.64.175"   
 PORT = 802 
 UNIT_ID = 255
 
 SEND_PERIOD_SEC = 10
 EXCEL_PATH = "weather_washingtonDC_2016.xlsx"  
+=======
+SERVER_IP = "172.17.148.129"
+PORT = 802
+UNIT_ID = 1
 
+SEND_PERIOD_SEC = 10
+EXCEL_PATH = "weather_washingtonDC_2016.xlsx"  
 
 def u16(x: int) -> int:
     return max(0, min(65535, int(x)))
+
 
 def pack_u32_to_2x_u16(u32: int):
     u32 = max(0, min(0xFFFFFFFF, int(u32)))
@@ -37,7 +45,8 @@ def build_weather_df(excel_path: str) -> pd.DataFrame:
     weather_df = weather_df.drop(1)
 
     # datetime index
-    weather_df["datetime"] = pd.to_datetime(weather_df[["Year", "Month", "Day", "Hour", "Minute"]])
+    weather_df["datetime"] = pd.to_datetime(
+        weather_df[["Year", "Month", "Day", "Hour", "Minute"]])
     weather_df.set_index("datetime", inplace=True)
     weather_df.index = pd.to_datetime(weather_df.index)
 
@@ -59,7 +68,8 @@ def build_weather_df(excel_path: str) -> pd.DataFrame:
     )
 
     # convert to float
-    cols = ["temp_air", "wind_speed", "humidity", "precipitable_water", "ghi", "dni", "dhi"]
+    cols = ["temp_air", "wind_speed", "humidity",
+            "precipitable_water", "ghi", "dni", "dhi"]
     for c in cols:
         weather_df[c] = weather_df[c].astype(float)
 
@@ -141,6 +151,11 @@ def main():
 
     print(f"Generated {len(series)} timesteps. Starting Modbus TLS client...")
 
+#    output_filename = 'pvlib_simulation_results.csv'
+#    series.to_csv(output_filename, index=True, index_label='Timestamp')
+
+#    print(f"Successfully wrote simulation results to {output_filename}")
+
     sslctx = ssl.create_default_context()
     sslctx.check_hostname = False
     sslctx.verify_mode = ssl.CERT_NONE 
@@ -185,7 +200,8 @@ def main():
             )
 
             try:
-                wr = client.write_registers(address=0, values=regs, device_id=UNIT_ID)
+                wr = client.write_registers(
+                    address=0, values=regs, device_id=UNIT_ID)
                 if wr.isError():
                     print("Modbus write error:", wr)
                 else:

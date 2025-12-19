@@ -18,7 +18,7 @@ try:
     while server.is_alive():
         # You can add logic here to update data bank values if needed
         # Example: server.data_bank.set_holding_registers(0, [100])
-        time.sleep(1)
+        time.sleep(100)
 
 except KeyboardInterrupt:
     print("Server stopped by user.")

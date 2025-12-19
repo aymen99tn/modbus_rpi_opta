@@ -28,6 +28,10 @@
 #include "config.h"
 #include "pv_data.h"
 
+#include <WiFiClientSecure.h>
+
+//TLS Client
+WiFiClientSecure client;
 
 // Modbus TCP client
 ModbusIP modbus;
@@ -100,6 +104,38 @@ void connectModbus() {
     // Just initialize the client
     modbus.client();
     modbus.autoConnect(true);
+
+   //TLS CLient connection
+   
+    if (!client.connect(RPI1_IP, RPI1_PORT)) 
+    {
+        Serial.println("Connection failed!");
+        return;
+    }
+    Serial.println("Connected to server!");
+
+    //SSL Certificate
+    const char* root_ca = "-----BEGIN CERTIFICATE-----\n"
+                      "MIIDETCCAfmgAwIBAgIUIrVHy4hoIbCn09BCNfRak2+QPR4wDQYJKoZIhvcNAQEL\n"
+                      "BQAwGDEWMBQGA1UEAwwNbW9kYnVzLXNlcnZlcjAeFw0yNTEyMTQyMzI3NTBaFw0y\n"
+                      "NjEyMTQyMzI3NTBaMBgxFjAUBgNVBAMMDW1vZGJ1cy1zZXJ2ZXIwggEiMA0GCSqG\n"
+                      "SIb3DQEBAQUAA4IBDwAwggEKAoIBAQC19+DYYJNPD8vWfN8mmG+BxGw5kYtNsOgZ\n"
+                      "w6RKkOIgGrlLJhtCGhzwDzWOYzboRIQD3EXwPa+5TiG8hsva2m2A/5K0xnSZ0Gkn\n"
+                      "eI7IEYjEgw3TzlWTuZnxdhHRK6aOkNNnQz2cA015z5LqkmgaIMsgmShYNgmzlnnZ\n"
+                      "LKQeCVV4+VSk7XH1ffeBC+5ML2KRPHJ2RBw/GOE35NgTKaw9GgKOnPJawjcvj/Kp\n"
+                      "4s3WgJIsw6seJZ3Y3GAvY7kfPytoQ1yvCV8ZnZnZ9zGX0vtl+cLd5f42W2IbZtTn\n"
+                      "q4rFK1QyFavMBuYg8hi5Hm37SCQKQ5QiQbF4LV5Vi1MqHCOeH+2rAgMBAAGjUzBR\n"
+                      "MB0GA1UdDgQWBBTWUYZX+OkM6klxAwl6Xj3sPVc5gjAfBgNVHSMEGDAWgBTWUYZX\n"
+                      "+OkM6klxAwl6Xj3sPVc5gjAPBgNVHRMBAf8EBTADAQH/MA0GCSqGSIb3DQEBCwUA\n"
+                      "A4IBAQAPV/rJXmKQawv8CEEAn0HIwmwEI7w8dkAbbC8CxtqVc/8uJI1OZaY/IU5L\n"
+                      "eDZLzeFzybu2YcTsygtYOH9qu5PZl/KVYyjNRe+jmvXlZUejbBQ7eBrNwhZmQ6bZ\n"
+                      "HBy0FqB3uPB2Xou8Rhkutme6JWCr4uVg/RI7S722O/vaPUPFNY1oZIgkFYsRnmaD\n"
+                      "Kvx9Nxh/ar5MCt7/qJLViaDRq131MBRMOuWfhKqY4cQEtrupRRgpAb7DfYttzSiD\n"
+                      "UpCWgKbHmRagmOHkZsSA8U1R7suFjB6ZZWpv7DrDTct4rLeFY7ek8/VUW5R3yQeg\n"
+                      "fmJFS9XBywShm1kKXoYKjESpAheN\n"
+                     "----END CERTIFICATE-----\n";
+    client.setCACert(root_ca);
+
 
     rpi1IpValid = rpi1Ip.fromString(RPI1_IP);
     if (!rpi1IpValid) {
@@ -310,6 +346,8 @@ void loop() {
         lastSendTime = currentTime;
 
         // Send current sample
+        // Need to place TLS Wrapper code here ......
+        
         bool success = sendPVSample();
 
         // Move to next sample

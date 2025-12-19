@@ -9,12 +9,12 @@
  */
 
 // WiFi Configuration
-#define WIFI_SSID "Aymen99tn"
-#define WIFI_PASSWORD "ca1920ca"
+#define WIFI_SSID "Abhijat's M32"
+#define WIFI_PASSWORD "ygoy7352"
 
 // RPI#1 Smart Meter Server Configuration
-#define RPI1_IP "10.21.66.250"      // RPI#1 WiFi IP address (Field zone)
-#define RPI1_PORT 502               // Modbus TCP port (plain TCP, no TLS)
+#define RPI1_IP "172.17.148.129"      // RPI#1 WiFi IP address (Field zone)
+#define RPI1_PORT 443               // Modbus TCP port (plain TCP, no TLS)
 #define MODBUS_UNIT_ID 1            // Modbus device ID (RPI#1 uses unit-id 1)
 
 // Data Transmission Configuration
