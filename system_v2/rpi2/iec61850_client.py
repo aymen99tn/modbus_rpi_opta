@@ -18,9 +18,18 @@ from typing import Optional
 try:
     import iec61850
     IEC61850_AVAILABLE = True
-except ImportError:
-    IEC61850_AVAILABLE = False
-    logging.warning("pyiec61850 not installed. IEC 61850 functionality disabled.")
+except Exception as exc:
+    try:
+        import pyiec61850 as iec61850
+        IEC61850_AVAILABLE = True
+    except Exception as exc2:
+        IEC61850_AVAILABLE = False
+        logging.warning(
+            "pyiec61850 import failed (%s). IEC 61850 functionality disabled.",
+            exc2,
+        )
+
+USE_CLASS_API = IEC61850_AVAILABLE and hasattr(iec61850, "IedConnection")
 
 import config
 
@@ -43,6 +52,44 @@ class IEC61850Client:
         self.ld = logical_device or config.LOGICAL_DEVICE
         self.connection = None
         self.connected = False
+        self.fc_default = getattr(iec61850, "IEC61850_FC_MX", None)
+
+    def _fc_from_code(self, code: str):
+        code = (code or "MX").upper()
+        if code == "MX":
+            return getattr(iec61850, "IEC61850_FC_MX", None)
+        if code == "SP":
+            return getattr(iec61850, "IEC61850_FC_SP", None)
+        if code == "ST":
+            return getattr(iec61850, "IEC61850_FC_ST", None)
+        if code == "CF":
+            return getattr(iec61850, "IEC61850_FC_CF", None)
+        return self.fc_default
+
+    def _parse_object_ref(self, object_ref: str):
+        """
+        Convert MMS variable name (MMXU1$MX$TotW$mag$f) to object ref
+        (MMXU1.TotW.mag.f) and extract FC.
+        """
+        ld_prefix = None
+        ref = object_ref
+        if "/" in ref:
+            ld_prefix, ref = ref.split("/", 1)
+
+        fc_code = "MX"
+        if "$" in ref:
+            parts = ref.split("$")
+            if len(parts) >= 2:
+                fc_code = parts[1]
+            dot_ref = ".".join([parts[0]] + parts[2:]) if len(parts) > 2 else parts[0]
+        else:
+            dot_ref = ref
+
+        if ld_prefix:
+            dot_ref = f"{ld_prefix}/{dot_ref}"
+
+        fc = self._fc_from_code(fc_code)
+        return dot_ref, fc
 
     async def connect(self):
         """
@@ -55,12 +102,16 @@ class IEC61850Client:
 
         try:
             # Create IED connection object
-            self.connection = iec61850.IedConnection()
+            if USE_CLASS_API:
+                self.connection = iec61850.IedConnection()
+                error = self.connection.connect(self.host, self.port)
+                ok_code = iec61850.IedConnectionError.IED_ERROR_OK
+            else:
+                self.connection = iec61850.IedConnection_create()
+                error = iec61850.IedConnection_connect(self.connection, self.host, self.port)
+                ok_code = iec61850.IED_ERROR_OK
 
-            # Connect to SIPROTEC
-            error = self.connection.connect(self.host, self.port)
-
-            if error != iec61850.IedConnectionError.IED_ERROR_OK:
+            if error != ok_code:
                 error_msg = f"IEC 61850 connection failed: {error}"
                 logger.error(error_msg)
                 raise ConnectionError(error_msg)
@@ -80,7 +131,11 @@ class IEC61850Client:
         """Close MMS connection"""
         if self.connection and self.connected:
             try:
-                self.connection.close()
+                if USE_CLASS_API:
+                    self.connection.close()
+                else:
+                    iec61850.IedConnection_close(self.connection)
+                    iec61850.IedConnection_destroy(self.connection)
                 logger.info("Disconnected from SIPROTEC")
             except Exception as e:
                 logger.error(f"Error during disconnect: {e}")
@@ -103,23 +158,39 @@ class IEC61850Client:
             return False
 
         try:
-            # Construct full MMS variable path
-            mms_var = f"{self.ld}/{object_ref}"
+            if USE_CLASS_API:
+                # Construct full MMS variable path
+                mms_var = f"{self.ld}/{object_ref}"
 
-            # Create MMS value (FLOAT32)
-            mms_value = iec61850.MmsValue_newFloat(value)
+                # Create MMS value (FLOAT32)
+                mms_value = iec61850.MmsValue_newFloat(value)
 
-            # Write to SIPROTEC
-            error = self.connection.writeValue(mms_var, mms_value)
+                # Write to SIPROTEC
+                error = self.connection.writeValue(mms_var, mms_value)
 
-            # Clean up MMS value
-            iec61850.MmsValue_delete(mms_value)
+                # Clean up MMS value
+                iec61850.MmsValue_delete(mms_value)
 
-            if error != iec61850.IedConnectionError.IED_ERROR_OK:
-                logger.error(f"Write failed for {mms_var}: {error}")
+                if error != iec61850.IedConnectionError.IED_ERROR_OK:
+                    logger.error(f"Write failed for {mms_var}: {error}")
+                    return False
+
+                logger.debug(f"✓ Wrote {value} to {mms_var}")
+                return True
+
+            obj_ref, fc = self._parse_object_ref(object_ref)
+            if "/" not in obj_ref:
+                obj_ref = f"{self.ld}/{obj_ref}"
+            if fc is None:
+                logger.error(f"Unknown functional constraint for {object_ref}")
                 return False
 
-            logger.debug(f"✓ Wrote {value} to {mms_var}")
+            error = iec61850.IedConnection_writeFloatValue(self.connection, obj_ref, fc, float(value))
+            if error != iec61850.IED_ERROR_OK:
+                logger.error(f"Write failed for {obj_ref}: {error}")
+                return False
+
+            logger.debug(f"✓ Wrote {value} to {obj_ref}")
             return True
 
         except Exception as e:
@@ -150,23 +221,42 @@ class IEC61850Client:
             NTP_UNIX_OFFSET = 2208988800
             ntp_timestamp = (unix_timestamp + NTP_UNIX_OFFSET) * 1000  # Convert to milliseconds
 
-            # Construct full MMS variable path
-            mms_var = f"{self.ld}/{object_ref}"
+            if USE_CLASS_API:
+                # Construct full MMS variable path
+                mms_var = f"{self.ld}/{object_ref}"
 
-            # Create MMS timestamp value
-            mms_value = iec61850.MmsValue_newUtcTimeByMsTime(ntp_timestamp)
+                # Create MMS timestamp value
+                mms_value = iec61850.MmsValue_newUtcTimeByMsTime(ntp_timestamp)
 
-            # Write to SIPROTEC
-            error = self.connection.writeValue(mms_var, mms_value)
+                # Write to SIPROTEC
+                error = self.connection.writeValue(mms_var, mms_value)
 
-            # Clean up MMS value
-            iec61850.MmsValue_delete(mms_value)
+                # Clean up MMS value
+                iec61850.MmsValue_delete(mms_value)
 
-            if error != iec61850.IedConnectionError.IED_ERROR_OK:
-                logger.error(f"Write timestamp failed for {mms_var}: {error}")
+                if error != iec61850.IedConnectionError.IED_ERROR_OK:
+                    logger.error(f"Write timestamp failed for {mms_var}: {error}")
+                    return False
+
+                logger.debug(f"✓ Wrote timestamp {unix_timestamp} to {mms_var}")
+                return True
+
+            obj_ref, fc = self._parse_object_ref(object_ref)
+            if "/" not in obj_ref:
+                obj_ref = f"{self.ld}/{obj_ref}"
+            if fc is None:
+                logger.error(f"Unknown functional constraint for {object_ref}")
                 return False
 
-            logger.debug(f"✓ Wrote timestamp {unix_timestamp} to {mms_var}")
+            mms_value = iec61850.MmsValue_newUtcTimeByMsTime(ntp_timestamp)
+            error = iec61850.IedConnection_writeObject(self.connection, obj_ref, fc, mms_value)
+            iec61850.MmsValue_delete(mms_value)
+
+            if error != iec61850.IED_ERROR_OK:
+                logger.error(f"Write timestamp failed for {obj_ref}: {error}")
+                return False
+
+            logger.debug(f"✓ Wrote timestamp {unix_timestamp} to {obj_ref}")
             return True
 
         except Exception as e:
@@ -189,23 +279,42 @@ class IEC61850Client:
             return False
 
         try:
-            # Construct full MMS variable path
-            mms_var = f"{self.ld}/{object_ref}"
+            if USE_CLASS_API:
+                # Construct full MMS variable path
+                mms_var = f"{self.ld}/{object_ref}"
 
-            # Create MMS quality value (bit string)
-            mms_value = iec61850.MmsValue_newBitString(quality)
+                # Create MMS quality value (bit string)
+                mms_value = iec61850.MmsValue_newBitString(quality)
 
-            # Write to SIPROTEC
-            error = self.connection.writeValue(mms_var, mms_value)
+                # Write to SIPROTEC
+                error = self.connection.writeValue(mms_var, mms_value)
 
-            # Clean up MMS value
-            iec61850.MmsValue_delete(mms_value)
+                # Clean up MMS value
+                iec61850.MmsValue_delete(mms_value)
 
-            if error != iec61850.IedConnectionError.IED_ERROR_OK:
-                logger.error(f"Write quality failed for {mms_var}: {error}")
+                if error != iec61850.IedConnectionError.IED_ERROR_OK:
+                    logger.error(f"Write quality failed for {mms_var}: {error}")
+                    return False
+
+                logger.debug(f"✓ Wrote quality {quality} to {mms_var}")
+                return True
+
+            obj_ref, fc = self._parse_object_ref(object_ref)
+            if "/" not in obj_ref:
+                obj_ref = f"{self.ld}/{obj_ref}"
+            if fc is None:
+                logger.error(f"Unknown functional constraint for {object_ref}")
                 return False
 
-            logger.debug(f"✓ Wrote quality {quality} to {mms_var}")
+            mms_value = iec61850.MmsValue_newBitString(quality)
+            error = iec61850.IedConnection_writeObject(self.connection, obj_ref, fc, mms_value)
+            iec61850.MmsValue_delete(mms_value)
+
+            if error != iec61850.IED_ERROR_OK:
+                logger.error(f"Write quality failed for {obj_ref}: {error}")
+                return False
+
+            logger.debug(f"✓ Wrote quality {quality} to {obj_ref}")
             return True
 
         except Exception as e:
@@ -227,23 +336,41 @@ class IEC61850Client:
             return None
 
         try:
-            # Construct full MMS variable path
-            mms_var = f"{self.ld}/{object_ref}"
+            if USE_CLASS_API:
+                # Construct full MMS variable path
+                mms_var = f"{self.ld}/{object_ref}"
 
-            # Read from SIPROTEC
-            mms_value = self.connection.readValue(mms_var)
+                # Read from SIPROTEC
+                mms_value = self.connection.readValue(mms_var)
 
-            if not mms_value:
-                logger.error(f"Read failed for {mms_var}")
+                if not mms_value:
+                    logger.error(f"Read failed for {mms_var}")
+                    return None
+
+                # Convert to string
+                value_str = iec61850.MmsValue_toString(mms_value)
+
+                # Clean up MMS value
+                iec61850.MmsValue_delete(mms_value)
+
+                return value_str
+
+            obj_ref, fc = self._parse_object_ref(object_ref)
+            if "/" not in obj_ref:
+                obj_ref = f"{self.ld}/{obj_ref}"
+            if fc is None:
+                logger.error(f"Unknown functional constraint for {object_ref}")
                 return None
 
-            # Convert to string
-            value_str = iec61850.MmsValue_toString(mms_value)
+            result = iec61850.IedConnection_readStringValue(self.connection, obj_ref, fc)
+            if isinstance(result, tuple):
+                value_str, error = result
+                if error != iec61850.IED_ERROR_OK:
+                    logger.error(f"Read failed for {obj_ref}: {error}")
+                    return None
+                return value_str
 
-            # Clean up MMS value
-            iec61850.MmsValue_delete(mms_value)
-
-            return value_str
+            return result
 
         except Exception as e:
             logger.error(f"Exception reading from {object_ref}: {e}")

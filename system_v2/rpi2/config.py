@@ -17,7 +17,7 @@ TRANSLATION_INTERVAL_SEC = 1.0  # Update rate to SIPROTEC
 
 # Network Configuration
 STATION_ZONE_IP = "192.168.2.200"  # Receives from Opta
-PROCESS_ZONE_IP = "192.168.3.200"  # Connects to SIPROTEC
+PROCESS_ZONE_IP = "192.168.1.21"  # Connects to SIPROTEC
 
 # IEC 61850 Data Object Mapping
 # Verify these with SIPROTEC ICD file or IEDScout
