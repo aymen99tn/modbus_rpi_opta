@@ -2,10 +2,10 @@
  * ESP32 Solar Inverter Simulator
  *
  * Simulates a PV solar inverter by reading pre-processed pvlib data and
- * transmitting telemetry to RPI#1 via Modbus TCP.
+ * transmitting telemetry to RPI#1 via Modbus TLS.
  *
  * Architecture:
- *   ESP32 (this device) --[WiFi, Modbus TCP Write:502]--> RPI#1 (Smart Meter/RTU)
+ *   ESP32 (this device) --[WiFi, Modbus TLS Write:802]--> RPI#1 (Smart Meter/RTU)
  *
  * Data Source:
  *   Pre-computed PV simulation data stored in Flash (PROGMEM)
@@ -24,13 +24,14 @@
 
 #include <Arduino.h>
 #include <WiFi.h>
-#include <ModbusIP_ESP8266.h>
+#include <ModbusTLS.h>
 #include "config.h"
 #include "pv_data.h"
+#include "tls_cert.h"
 
 
-// Modbus TCP client
-ModbusIP modbus;
+// Modbus TLS client
+ModbusTLS modbus;
 IPAddress rpi1Ip;
 bool rpi1IpValid = false;
 
@@ -87,17 +88,17 @@ void connectWiFi() {
 }
 
 /**
- * Connect to Modbus TCP server (RPI#1)
+ * Connect to Modbus TLS server (RPI#1)
  */
 void connectModbus() {
-    Serial.println("Connecting to RPI#1 Modbus server...");
+    Serial.println("Connecting to RPI#1 Modbus TLS server...");
     Serial.print("  Target: ");
     Serial.print(RPI1_IP);
     Serial.print(":");
     Serial.println(RPI1_PORT);
+    Serial.println("  Protocol: Modbus over TLS (encrypted)");
 
-    // ModbusIP_ESP8266 library auto-connects on first write
-    // Just initialize the client
+    // Initialize ModbusTLS client
     modbus.client();
     modbus.autoConnect(true);
 
@@ -108,46 +109,57 @@ void connectModbus() {
         return;
     }
 
-    modbusConnected = modbus.connect(rpi1Ip, RPI1_PORT);
-    if (modbusConnected) {
-        Serial.println("✓ Modbus TCP connected");
-    } else {
-        Serial.println("✗ Modbus TCP connect failed");
-    }
+    // Connect with TLS
+    // ModbusTLS::connect(ip, port, client_cert, client_key, ca_cert)
+    // For ESP32: If ca_cert is nullptr, certificate validation is skipped
+    // Parameters: No client cert/key needed (server-only TLS)
+    //             No CA cert = skip verification (testing mode)
+    modbusConnected = modbus.connect(rpi1Ip, RPI1_PORT, nullptr, nullptr, nullptr);
 
-    Serial.println("✓ Modbus client initialized");
+    if (modbusConnected) {
+        Serial.println("✓ Modbus TLS connected (encrypted channel established)");
+        Serial.println("  Note: Certificate verification skipped (testing mode)");
+    } else {
+        Serial.println("✗ Modbus TLS connect failed");
+        Serial.println("  Check:");
+        Serial.println("    - RPI#1 TLS server is running on port 802");
+        Serial.println("    - Firewall allows port 802");
+        Serial.println("    - Certificates are valid on RPI#1");
+    }
 }
 
 /**
- * Quick TCP connectivity check to RPI#1
+ * Quick TLS connectivity check to RPI#1
+ * Note: This tests plain TCP socket, not TLS handshake
  */
-bool testTcpConnection() {
+bool testTlsConnection() {
     IPAddress server_ip;
     if (!server_ip.fromString(RPI1_IP)) {
         Serial.println("✗ Invalid RPI1_IP format");
         return false;
     }
 
-    WiFiClient client;
+    WiFiClient client;  // Using plain client for quick socket test
     client.setTimeout(MODBUS_CONNECT_TIMEOUT_MS / 1000);
     bool connected = client.connect(server_ip, RPI1_PORT);
     if (connected) {
         client.stop();
         if (DEBUG_ENABLED) {
-            Serial.println("✓ TCP connect OK");
+            Serial.println("✓ TCP socket connect OK (TLS handshake not tested)");
         }
         return true;
     }
 
     totalTcpFailures++;
-    Serial.print("✗ TCP connect failed (Total TCP failures: ");
+    Serial.print("✗ TCP socket connect failed (Total failures: ");
     Serial.print(totalTcpFailures);
     Serial.println(")");
+    Serial.println("  TLS server may not be listening on port 802");
     return false;
 }
 
 /**
- * Send current PV sample to RPI#1 via Modbus TCP
+ * Send current PV sample to RPI#1 via Modbus TLS
  */
 bool sendPVSample() {
     // Read sample from PROGMEM
@@ -218,10 +230,10 @@ bool sendPVSample() {
         }
 
         if (!modbusConnected || !modbus.isConnected(rpi1Ip)) {
-            modbusConnected = modbus.connect(rpi1Ip, RPI1_PORT);
+            modbusConnected = modbus.connect(rpi1Ip, RPI1_PORT, nullptr, nullptr, nullptr);
             if (!modbusConnected) {
-                Serial.println("✗ Modbus TCP connect failed");
-                testTcpConnection();
+                Serial.println("✗ Modbus TLS connect failed");
+                testTlsConnection();
                 continue;
             }
         }
@@ -239,7 +251,7 @@ bool sendPVSample() {
             }
         } else {
             Serial.println("✗ Modbus write failed");
-            testTcpConnection();
+            testTlsConnection();
         }
     }
 
@@ -264,7 +276,7 @@ void setup() {
     delay(1000);
 
     Serial.println("================================================================================");
-    Serial.println("ESP32 Solar Inverter Simulator");
+    Serial.println("ESP32 Solar Inverter Simulator (Modbus TLS)");
     Serial.println("================================================================================");
     Serial.print("PV Data: ");
     Serial.print(PV_DATA_COUNT);
@@ -285,7 +297,7 @@ void setup() {
     }
 
     Serial.println("================================================================================");
-    Serial.println("Starting data transmission...");
+    Serial.println("Starting encrypted data transmission (TLS)...");
     Serial.println("================================================================================");
 }
 

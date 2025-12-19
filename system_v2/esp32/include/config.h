@@ -13,9 +13,13 @@
 #define WIFI_PASSWORD "ca1920ca"
 
 // RPI#1 Smart Meter Server Configuration
-#define RPI1_IP "10.21.66.250"      // RPI#1 WiFi IP address (Field zone)
-#define RPI1_PORT 502               // Modbus TCP port (plain TCP, no TLS)
+#define RPI1_IP "10.21.66.250"      // RPI#1 WiFi IP address (TLS encrypted connection)
+#define RPI1_PORT 802               // Modbus TLS port (encrypted with TLS)
 #define MODBUS_UNIT_ID 1            // Modbus device ID (RPI#1 uses unit-id 1)
+
+// TLS Configuration
+#define TLS_SKIP_VERIFICATION true  // Skip certificate verification (testing mode)
+                                     // Set to false in production with valid CA cert
 
 // Data Transmission Configuration
 #define SEND_INTERVAL_MS 10000        // 10 seconds between samples
